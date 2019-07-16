@@ -1,0 +1,66 @@
+/* Rexx */
+/*                                   */
+/* 1. Get index of remote JOBLIB     */
+/* 2. Call get (MEMNAME) in loop     */
+/* 3. Write each member to USERLIB   */
+/*                                   */
+/* --------- */
+URL = '/mvsds/''your.remote.job'''
+USERLIB='YOUR.LOCAL.JOBLIB'
+IP = '1.1.1.1'
+/* --------- */
+call getHttp2 IP URL
+if result == '' then exit 8
+/* get $INDEX */
+call parseIndex result
+/* Call get (memname) in loop and write to member */
+do k = 1 to index.0
+  memURL = insert('('space(index.k)')',URL,length(URL)-1)
+  call getHttp2 IP memURL
+  call writeDsn index.k,result
+end
+exit 0
+
+parseIndex:
+line = arg(1)
+do j = 1 BY 1 WHILE line <> ''
+/* hex(25) - End Of Line separator */
+  PARSE VAR line '">' index.j '</a>' line
+  say 'ind.'j':'space(index.j)
+end
+/* last string will be empty after parse */
+index.0=j-2
+return 0
+
+queueFile:
+line = arg(1)
+do j = 1 BY 1 WHILE line <> ''
+/* hex(25) - End Of Line separator */
+  PARSE VAR line strings.j '25'x line
+  QUEUE strings.j
+end
+/* QUEUE null line for EXECIO */
+QUEUE
+return 0
+
+printFile:
+line = arg(1)
+do j = 1 BY 1 WHILE line <> ''
+/* hex(25) - End Of Line separator */
+  PARSE VAR line strings.j '25'x line
+  say 'STR.'j ' ' strings.j
+end
+return 0
+
+writeDsn:
+member=arg(1)
+content=arg(2)
+dsn=insert('('space(member)')',USERLIB,length(USERLIB))
+say 'writing dsn:'dsn
+"ALLOC DA('"dsn"') F(OUTDD) OLD REUSE"
+"NEWSTACK"
+call queueFile content
+"EXECIO * DISKW OUTDD (FINIS"
+"DELSTACK"
+"FREE F(OUTDD)"
+return 0
