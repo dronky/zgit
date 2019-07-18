@@ -1,15 +1,15 @@
 /* Rexx */
 /*                                   */
 /* 1. Get index of remote JOBLIB     */
-/* 2. Write index to USERLIB($INDEX) */
-/* 3. Call get (MEMNAME) in loop     */
-/* 4. Write each member to USERLIB   */
+/* 2. Call get (MEMNAME) in loop     */
+/* 3. Write each member to USERLIB   */
 /*                                   */
 /* --------- */
 URL = '/mvsds/''your.remote.joblib'''
 USERLIB='YOUR.LOCAL.JOBLIB'
 IP = '10.10.10.10'
 HOSTNAME = 'your.hostname.ru'
+VOLUME = 'WRKVOL'
 /* --------- */
 result = getHttp(IP,URL,HOSTNAME)
 if result == '' then exit 8
@@ -19,8 +19,10 @@ call parseIndex result
 do k = 1 to index.0
   memURL = insert('('space(index.k)')',URL,length(URL)-1)
   result = getHttp(IP,memURL,HOSTNAME)
-  call writeDsn index.k,result
+  call writeDsn index.k,result,VOLUME
 end
+/* Open dataset in ISPF */
+address ISPEXEC "EDIT DATASET('"USERLIB"')"
 exit 0
 
 parseIndex:
@@ -57,11 +59,12 @@ return 0
 writeDsn:
 member=arg(1)
 content=arg(2)
+vol=arg(3)
 dsn=insert('('space(member)')',USERLIB,length(USERLIB))
 say 'writing dsn:'dsn
 if sysdsn("'"USERLIB"'")='OK' THEN "ALLOC DA('"dsn"') F(OUTDD) OLD REUSE"
 else "ALLOC DA('"dsn"') F(OUTDD) SPACE(50,10) TRACKS LRECL(80) RECFM(F B)",
-     "DSORG(PO) DIR(20) NEW REUSE"
+     "DSORG(PO) DIR(20) VOLUME("vol") NEW REUSE"
 "NEWSTACK"
 call queueFile content
 "EXECIO * DISKW OUTDD (FINIS"
